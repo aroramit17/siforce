@@ -1,0 +1,19 @@
+{
+  "name": "siforce",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Voice-driven AI copilot that floats on top of Salesforce. Talk to it, and it updates your records.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch",
+    "test": "node --test test/*.test.js",
+    "test:e2e": "node test/e2e/run.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.134.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

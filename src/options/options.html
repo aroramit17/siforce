@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SiForce Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main>
+    <h1><span class="logo">✦</span> SiForce settings</h1>
+    <p class="lede">SiForce floats on top of Salesforce. Press the mic, say what you want done, and it carries it out in your org using your existing Salesforce login.</p>
+
+    <form id="form">
+      <section>
+        <h2>Claude</h2>
+        <label>Anthropic API key
+          <input id="apiKey" type="password" autocomplete="off" placeholder="sk-ant-..." required>
+        </label>
+        <p class="help">Stored only in this browser's extension storage and sent only to api.anthropic.com. Get a key at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.</p>
+
+        <label>Model
+          <select id="model">
+            <option value="claude-opus-5-5">Claude Opus 5.5 (most capable, default)</option>
+            <option value="claude-sonnet-5-5">Claude Sonnet 5.5 (faster)</option>
+            <option value="claude-haiku-5-5">Claude Haiku 5.5 (fastest, cheapest)</option>
+          </select>
+        </label>
+
+        <label>Effort
+          <select id="effort">
+            <option value="low">Low: quickest replies</option>
+            <option value="medium">Medium: balanced (default)</option>
+            <option value="high">High: most careful</option>
+          </select>
+        </label>
+      </section>
+
+      <section>
+        <h2>Voice</h2>
+        <label class="check"><input id="speakReplies" type="checkbox"> Read replies aloud</label>
+        <label>Speech language
+          <input id="lang" type="text" placeholder="Browser default (e.g. en-US)">
+        </label>
+        <p class="help">Shortcut to start or stop talking: <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd>. Change it at <code>chrome://extensions/shortcuts</code>.</p>
+      </section>
+
+      <section>
+        <h2>Safety</h2>
+        <label class="check"><input id="confirmWrites" type="checkbox"> Ask me before changing any record</label>
+        <p class="help">Lead conversion always asks first, because it can't be undone from the Salesforce UI.</p>
+      </section>
+
+      <div class="actions">
+        <button type="submit">Save</button>
+        <span id="status" role="status"></span>
+      </div>
+    </form>
+  </main>
+  <script type="module" src="options.js"></script>
+</body>
+</html>

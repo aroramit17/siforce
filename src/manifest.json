@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "SiForce – Voice Copilot for Salesforce",
+  "short_name": "SiForce",
+  "version": "0.1.0",
+  "description": "Talk to Salesforce. Press the mic, say what you want, and SiForce updates your records with Claude.",
+  "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" },
+  "action": {
+    "default_title": "SiForce: open the voice panel",
+    "default_icon": { "16": "icons/16.png", "32": "icons/32.png" }
+  },
+  "background": { "service_worker": "background.js", "type": "module" },
+  "options_page": "options.html",
+  "permissions": ["storage", "cookies", "scripting"],
+  "host_permissions": [
+    "https://*.lightning.force.com/*",
+    "https://*.salesforce.com/*",
+    "https://*.salesforce-setup.com/*",
+    "https://*.force.com/*",
+    "https://*.cloudforce.com/*",
+    "https://*.salesforce.mil/*",
+    "https://api.anthropic.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.lightning.force.com/*",
+        "https://*.my.salesforce.com/*",
+        "https://*.my.salesforce-setup.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "commands": {
+    "toggle-listening": {
+      "suggested_key": { "default": "Alt+Shift+M" },
+      "description": "Start or stop talking to SiForce"
+    }
+  }
+}

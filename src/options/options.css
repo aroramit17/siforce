@@ -1,0 +1,28 @@
+:root {
+  --accent: #5b4ce0; --bg: #f6f7fb; --card: #fff; --text: #181b25; --muted: #5f6577; --border: #e1e3ec;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #14151c; --card: #1e2029; --text: #eceef4; --muted: #a3a8b8; --border: #2f3240; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+main { max-width: 620px; margin: 0 auto; padding: 40px 16px 64px; }
+h1 { display: flex; align-items: center; gap: 10px; font-size: 24px; margin: 0 0 8px; }
+.logo { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; color: #fff; background: linear-gradient(135deg, #5b4ce0, #0b7ae0); font-size: 16px; }
+.lede { color: var(--muted); margin: 0 0 24px; }
+section { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; margin-bottom: 16px; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0 0 12px; }
+label { display: block; font-weight: 600; margin: 12px 0 4px; }
+label:first-of-type { margin-top: 0; }
+input[type=password], input[type=text], select {
+  display: block; width: 100%; margin-top: 6px; padding: 9px 11px; font: inherit; font-weight: 400;
+  color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 9px;
+}
+input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+label.check { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+.help { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
+a { color: var(--accent); }
+kbd, code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; padding: 1px 5px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); }
+.actions { display: flex; align-items: center; gap: 12px; }
+button { font: inherit; font-weight: 600; padding: 10px 22px; border: 0; border-radius: 10px; background: var(--accent); color: #fff; cursor: pointer; }
+#status { color: var(--muted); }
