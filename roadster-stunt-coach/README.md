@@ -1,43 +1,61 @@
 # Roadster Stunt Coach
 
-A silly parody iPhone game inspired by the Roadster stunt reveal. Hold your phone like a tiny car, then tilt, flip and spin it to pull off stunts. You get **4 seconds of fuel**, and every stunt files a fake insurance claim.
+A parody iPhone game that recreates the October 2026 Roadster reveal: a car drives a loop upside down on suction fans, jumps a row of parked vehicles on cold-gas thrusters, and lands softly. You fly it from a cockpit with throttle, a suction fan switch, two thruster banks, and a dashboard of gauges. Every stunt files a fake insurance claim.
 
 Unofficial and unaffiliated with any car company, rocket company or insurer.
 
-## How a run works
+## What the reveal showed (and what the game models)
 
-1. Tap **IGNITION**. A 3-second countdown gives you time to get a grip.
-2. The fuel gauge starts draining: 4.00s, in real time.
-3. Every stunt the motion sensors detect files a claim with a claim number, a description, an adjuster's note, a dollar amount, and a stamp: APPROVED, DENIED (with a reason) or UNDER REVIEW.
-4. Clean landings refund a little fuel ("regenerative braking": +0.3s greased, +0.15s clean). Stunts landed within 1.25s of each other chain into a multiplier (+0.25× per link, capped at ×3).
-5. When the tank runs dry you get the **Claims Report**: total claimed, actually paid, premium increase, your longest chain, and the coach's verdict, from *Never Left the Showroom* up to *Uninsurable*. Share it or run it back.
+| At the reveal | In the game |
+|---|---|
+| Underbody fans pulled air from under the car, enough suction (reported up to ~2 g) to hold it upside down on a curved ramp | **SUCTION FAN** switch: spools up in 0.5 s, adds up to 2 g of grip and some drag, overheats after ~4 s and shuts off until it cools |
+| Cold-gas thrusters fed by carbon-fibre air tanks (COPVs) | **BOOST** (rear thrusters) and **LIFT** (underbody thrusters) share one **COPV AIR** tank: about 4 s of firing in total |
+| Claimed 0–60 mph in about 0.81 s | A 0–60 timer. Full boost from the line does it in 0.79 s |
+| Launched off a ramp, cleared five parked vehicles, flipped in the air | A kicker ramp, five parked vehicles, and tilt-to-rotate in the air. Full turns count as flips |
+| Thrusters softened the landing | Land within 25° of the surface and under 9 m/s into it, or it's a crash |
+| No one was in the car | Crash claims are denied: "There was no driver. The car filed this claim itself." |
 
-## Stunts
+## The course
 
-Hold the phone upright in portrait, screen facing you.
+```
+ START ── runway ──(  LOOP  )── flat ── kicker ╱   Sedan Crossover Truck Robotaxi Semi   ╲ LAND HERE ── runout
+                   28 m tall                   25°                                      ╲ 12° landing ramp
+```
 
-| Stunt | How | Detected as | Base claim |
-|---|---|---|---|
-| The Ramp | Snap the nose up past 40°, then back down | Rotation around the x axis, 40° to 300° | $1,200 |
-| The Hover | Hold dead still for 1 second | Rotation < 0.25 rad/s and acceleration < 0.06 g for 1s | $9,999 |
-| The Donut | Turn it 360° like a steering wheel | Rotation around z ≥ 300° | $4,200 |
-| The Launch | Jolt it straight up, fast | Upward acceleration ≥ 1.1 g | $6,500 |
-| The Kickflip | Roll it 360° along its long edge | Rotation around y ≥ 300° | $8,500 |
-| The Backflip | Flip it end over end | Rotation around x ≥ 300° | $14,000 |
-| The Double Kickflip | Two full rolls | Rotation around y ≥ 660° | $22,000 |
-| The Tre Flip | Kickflip plus a half spin | y ≥ 300° and z ≥ 150° in one move | $31,000 |
+1. **Runway (22 m).** Hold THROTTLE. The motor is grip- and power-limited, so it alone can't carry you through the loop.
+2. **The Loop (14 m radius).** On the ceiling you stay on only if speed plus suction beats gravity. Watch the GRIP gauge. Fan on from just before the loop until past the top works. Fan off before the top drops you. Fan on the whole run overheats it. Burning about 0.6 s of BOOST on the runway also gets you through, at the cost of air.
+3. **Kicker (25°).** Full throttle up the ramp. It throws you over the lineup at ~30 m/s.
+4. **Air.** Turn the phone like a steering wheel to rotate the car (or use the on-screen rotate buttons). Match the landing ramp's −12° slope. Fire LIFT on the way down to soften the touchdown.
+5. **Landing.** Under 3.5 m/s is greased.
 
-Landing grades scale the claim: **Greased** ×1.5, **Clean** ×1.0, **Sketchy** ×0.6. For flips, the grade depends on how close you came to a whole number of turns. For the ramp, it depends on whether the nose came back down.
+## Cockpit
 
-Play over a bed or a couch. The claims are fake; the cracked screen would be real.
+- **Left:** SUCTION FAN switch (with OFF / SPOOLING / SEALED / OVERHEAT light) and the THROTTLE pedal.
+- **Middle:** SPEED and COPV AIR dials, plus FAN RPM, FAN TEMP, GRIP (in g) and ALT bars.
+- **Right:** LIFT and BOOST. You can hold several at once.
+- **Top:** caution lights (GRIP LOW, INVERTED, FAN HOT, LOW AIR, BOOST, LIFT) and the 0–60 timer against the reveal's 0.81 s.
+- **Coach:** shouts what to do next ("Loop ahead! FAN ON or BOOST!", "Nose down!", "LIFT! Soften the landing!").
+
+## Claims and score
+
+| Claim | Base | Graded by |
+|---|---|---|
+| The Launch | $5,000 | 0–60 time: under 0.81 s is greased |
+| The Loop | $12,000 | Greased if you cut it within 1 g of falling off |
+| The Five-Car Hop | $4,000 per vehicle | All five is greased |
+| The Backflip / Frontflip | $15,000 / $18,000 per flip | Landing |
+| The Thruster Landing | $10,000 | Impact speed |
+| Totaled | $250,000 | Always denied, never scored |
+
+Grades multiply the claim: greased ×1.5, clean ×1, sketchy ×0.6. Your score is the total of your stunt claims, and your best is saved as your "personal worst".
 
 ## Build and run
 
-Requires Xcode 16 or later and iOS 17 or later.
+Requires Xcode 16 or later and iOS 17 or later. The game runs in landscape.
 
 1. Open `RoadsterStuntCoach.xcodeproj`.
 2. Select the **RoadsterStuntCoach** target → *Signing & Capabilities*, pick your team, and change the bundle identifier from `com.example.RoadsterStuntCoach` to one you own.
-3. Run on a real iPhone. The Simulator has no gyro, so it shows tap-to-fake stunt buttons instead.
+3. Run on an iPhone. The Simulator works too, but it has no gyro, so it shows NOSE UP / NOSE DN buttons instead of tilt steering. Tilt steering can also be turned off on the title screen.
 
 If the project won't open in your Xcode version, regenerate it from `project.yml`:
 
@@ -51,7 +69,7 @@ xcodegen
 
 ## Tests
 
-The game rules (stunt detection, fuel, chains, claims, ranks) are plain Swift with no UIKit or CoreMotion, so they also build as a Swift package. The tests feed scripted 100 Hz motion into the detector, so no phone or simulator is needed:
+The physics, scoring and claims are plain Swift with no UIKit or CoreMotion, so they also build as a Swift package. The tests fly scripted pilots through the course: throttle-only falls off the loop, the fan or a boost gets through, the fan left on overheats, full boost beats 0.81 s, landing nose-up crashes, coasting from the loop top hits the Semi, and a backflip with a lift burn lands.
 
 ```bash
 swift test
@@ -62,19 +80,26 @@ swift test
 ```
 RoadsterStuntCoach/
   App/RoadsterStuntCoachApp.swift   App entry and phase switching
-  App/GameController.swift          Countdown, run loop, sensors → session, best score, coach lines
-  App/Haptics.swift                 Countdown, landing and out-of-fuel haptics
-  Motion/MotionEngine.swift         CoreMotion device motion at 100 Hz → MotionSample
+  App/GameController.swift          Frame loop (fixed 120 Hz sim steps), tilt, haptics, camera, crash paperwork, report
+  App/FrameDriver.swift             CADisplayLink wrapper
+  App/Haptics.swift                 Thruster rumble, landing and crash feedback
+  Motion/TiltSensor.swift           Device gravity → steering-wheel angle
   Core/                             Pure game rules, shared with Package.swift
-    StuntDetector.swift             Gesture segmentation and stunt classification
-    FuelGauge.swift                 The 4-second tank
-    GameSession.swift               Chains, multipliers, refunds, filing claims
+    Course.swift                    Loop, kicker, parked vehicles, landing ramp geometry
+    LaunchSim.swift                 Car physics: grip, suction, motor, thrusters, flight, landing, crashes
+    Coach.swift                     Tilt steering math and the coach's lines
+    Stunt.swift                     Stunt kinds, grades, and turning a finished run into stunts
     InsuranceAdjuster.swift         Seeded claim generator and all the paperwork copy
-    ClaimsReport.swift              Totals, ranks, share text, money formatting
-  Views/                            Title, run, fuel gauge and claims report screens
+    ClaimsReport.swift              Score, ranks, share text, money formatting
+  Views/
+    CourseCanvas.swift              Side-view renderer: sky, test stand, loop, kicker, lineup, ramp, car, plumes
+    CockpitView.swift               Course + HUD + dashboard
+    CockpitControls.swift           Dial and bar gauges, caution lights, hold buttons, fan switch
+    TitleView.swift                 Title and flight manual
+    ClaimsReportView.swift          The claims report
 Tests/StuntCoreTests/               XCTest suite for Core
 ```
 
-### How detection works
+### Physics, briefly
 
-`StuntDetector` splits motion into gestures. A gesture starts when the phone spins faster than 2.5 rad/s, integrates rotation on each axis, and ends once the phone settles below 1 rad/s for 150 ms (or after 2 seconds). The gesture is classified by its **peak** rotation per axis and graded by its **net** rotation. Snapping up into a ramp, pausing, then coming back down is counted once: an opposite-direction ramp within 0.8s of a ramp is treated as the way back down. Launches and hovers are checked on every sample. All thresholds live in `StuntDetector.Thresholds` for tuning on real hardware.
+On the track the car's load into the surface is `v²/r + g·cos θ + suction`. If it drops below zero on the loop, the car falls. Motor traction is capped by `grip × load`, and above ~10 m/s by power (`90 / v` m/s²). Thrusters push along the car's axes regardless of grip. In the air it's a point mass with drag, plus a rotation rate you control. All the numbers live in `Tuning`. They were tuned against a scripted prototype so each system matters.

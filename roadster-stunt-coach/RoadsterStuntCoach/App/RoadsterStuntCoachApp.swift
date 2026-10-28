@@ -2,19 +2,19 @@ import SwiftUI
 
 @main
 struct RoadsterStuntCoachApp: App {
-    @StateObject private var game = GameController()
+    @State private var game = GameController()
 
     var body: some Scene {
         WindowGroup {
             RootView()
-                .environmentObject(game)
+                .environment(game)
                 .preferredColorScheme(.dark)
         }
     }
 }
 
 struct RootView: View {
-    @EnvironmentObject private var game: GameController
+    @Environment(GameController.self) private var game
 
     var body: some View {
         ZStack {
@@ -23,10 +23,10 @@ struct RootView: View {
             case .title:
                 TitleView()
                     .transition(.opacity)
-            case .countdown, .running:
-                RunView()
+            case .cockpit:
+                CockpitView()
                     .transition(.opacity)
-            case .finished:
+            case .report:
                 ClaimsReportView()
                     .transition(.move(edge: .bottom))
             }

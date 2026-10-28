@@ -8,6 +8,10 @@ extension Color {
     static let claimInk = Color(red: 0.13, green: 0.14, blue: 0.2)
     static let stampGreen = Color(red: 0.1, green: 0.55, blue: 0.3)
     static let stampAmber = Color(red: 0.8, green: 0.5, blue: 0.05)
+    static let dashPanel = Color(red: 0.09, green: 0.09, blue: 0.11)
+    static let gaugeCyan = Color(red: 0.3, green: 0.85, blue: 1.0)
+    static let fanTeal = Color(red: 0.2, green: 0.95, blue: 0.75)
+    static let thrusterBlue = Color(red: 0.55, green: 0.8, blue: 1.0)
 }
 
 extension Font {
@@ -22,11 +26,11 @@ extension Font {
     }
 }
 
-extension LandingGrade {
+extension Grade {
     var color: Color {
         switch self {
         case .greased: return .green
-        case .clean: return .white
+        case .clean: return .claimInk
         case .sketchy: return .orange
         }
     }
@@ -39,22 +43,6 @@ extension ClaimStatus {
         case .denied: return .roadsterRed
         case .underReview: return .stampAmber
         }
-    }
-}
-
-struct DifficultyDots: View {
-    let level: Int
-
-    var body: some View {
-        HStack(spacing: 3) {
-            ForEach(1...5, id: \.self) { index in
-                Circle()
-                    .fill(index <= level ? Color.roadsterRed : Color.white.opacity(0.15))
-                    .frame(width: 6, height: 6)
-            }
-        }
-        .accessibilityElement()
-        .accessibilityLabel("Difficulty \(level) of 5")
     }
 }
 

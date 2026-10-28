@@ -1,174 +1,267 @@
-import SwiftUI
+import Foundation
+import Observation
 import UIKit
 
-/// Runs the title → countdown → run → claims report loop and bridges sensors, timers and
-/// haptics to the pure `GameSession`.
+/// Follows the car, looking ahead of it and zooming out in the air.
+struct Camera {
+    var x = 0.0
+    var y = 6.0
+    var metersWide = 50.0
+}
+
+/// Claim forms that blow out of the car when it crashes.
+struct Paper: Identifiable {
+    let id: Int
+    var x: Double
+    var y: Double
+    var vx: Double
+    var vy: Double
+    var angle: Double
+    var spin: Double
+}
+
+/// Runs the title → cockpit → claims report loop: steps the sim at a fixed rate every
+/// frame, reads tilt, fires haptics on sim events and builds the report at the end.
+@Observable
 @MainActor
-final class GameController: ObservableObject {
-    enum Phase: Equatable {
+final class GameController {
+    enum Phase {
         case title
-        case countdown(Int)
-        case running
-        case finished
+        case cockpit
+        case report
     }
 
-    @Published private(set) var phase: Phase = .title
-    @Published private(set) var fuelRemaining: TimeInterval = FuelGauge.capacity
-    @Published private(set) var claims: [InsuranceClaim] = []
-    @Published private(set) var chain = 0
-    @Published private(set) var coachLine = CoachLines.ignition.randomElement() ?? ""
-    @Published private(set) var report: ClaimsReport?
-    @Published private(set) var isNewBest = false
-    @Published private(set) var bestTotal: Int = UserDefaults.standard.integer(forKey: Keys.bestTotal) {
-        didSet { UserDefaults.standard.set(bestTotal, forKey: Keys.bestTotal) }
+    struct Callout: Equatable {
+        let id: Int
+        let text: String
+        let until: Double
     }
 
-    var latestClaim: InsuranceClaim? { claims.last }
-    var totalClaimed: Int { claims.reduce(0) { $0 + $1.amount } }
-    var motionAvailable: Bool { motion.isAvailable }
+    static let stepSeconds = 1.0 / 120.0
+
+    private(set) var phase: Phase = .title
+    private(set) var sim = LaunchSim()
+    /// Set by the cockpit's buttons and switches. Spin is filled in from tilt or the rotate buttons.
+    var controls = Controls()
+    /// -1, 0 or 1 from the on-screen rotate buttons.
+    var spinButtons = 0.0
+    var useTilt: Bool = UserDefaults.standard.object(forKey: Keys.useTilt) as? Bool ?? true {
+        didSet { UserDefaults.standard.set(useTilt, forKey: Keys.useTilt) }
+    }
+
+    private(set) var camera = Camera()
+    private(set) var papers: [Paper] = []
+    private(set) var clock = 0.0
+    private(set) var coachLine = ""
+    private(set) var callout: Callout?
+    private(set) var report: ClaimsReport?
+    private(set) var isNewBest = false
+    private(set) var bestScore = UserDefaults.standard.integer(forKey: Keys.bestScore) {
+        didSet { UserDefaults.standard.set(bestScore, forKey: Keys.bestScore) }
+    }
+
+    var tiltAvailable: Bool { tilt.isAvailable }
+    var steeringWithTilt: Bool { useTilt && tilt.isAvailable }
 
     private enum Keys {
-        static let bestTotal = "bestTotalClaimed"
+        static let bestScore = "bestScore"
+        static let useTilt = "useTiltSteering"
     }
 
-    private var session = GameSession(seed: 0)
-    private let motion = MotionEngine()
-    private let haptics = Haptics()
-    private var timer: Timer?
-    private var countdownTask: Task<Void, Never>?
+    @ObservationIgnored private let tilt = TiltSensor()
+    @ObservationIgnored private let haptics = Haptics()
+    @ObservationIgnored private var driver: FrameDriver?
+    @ObservationIgnored private var accumulator = 0.0
+    @ObservationIgnored private var finishedAt: Double?
+    @ObservationIgnored private var lastRumble = 0.0
+    @ObservationIgnored private var calloutCount = 0
 
-    func startRun() {
-        stopEverything()
-        session = GameSession(seed: UInt64.random(in: .min ... .max))
-        fuelRemaining = FuelGauge.capacity
-        claims = []
-        chain = 0
+    // MARK: - Flow
+
+    func newRun() {
+        stopLoop()
+        sim = LaunchSim()
+        controls = Controls()
+        spinButtons = 0
+        papers = []
         report = nil
         isNewBest = false
-        coachLine = CoachLines.countdown.randomElement() ?? ""
+        callout = nil
+        finishedAt = nil
+        accumulator = 0
+        clock = 0
+        camera = Camera(x: sim.x + 12, y: 6, metersWide: 50)
+        coachLine = Coach.line(for: sim)
+        phase = .cockpit
+
         UIApplication.shared.isIdleTimerDisabled = true
         haptics.prepare()
-
-        countdownTask = Task { [weak self] in
-            for count in stride(from: 3, through: 1, by: -1) {
-                guard let self, !Task.isCancelled else { return }
-                self.phase = .countdown(count)
-                self.haptics.countdown()
-                try? await Task.sleep(nanoseconds: 800_000_000)
-            }
-            guard let self, !Task.isCancelled else { return }
-            self.ignite()
-        }
+        tilt.start()
+        tilt.recenter()
+        let driver = FrameDriver { [weak self] dt in self?.frame(dt) }
+        self.driver = driver
+        driver.start()
     }
 
-    /// Back to the garage without a report.
-    func abandonRun() {
-        stopEverything()
+    func toggleFan() {
+        controls.fan.toggle()
+        haptics.click()
+    }
+
+    func recenterTilt() {
+        tilt.recenter()
+    }
+
+    func quitToTitle() {
+        stopLoop()
+        phase = .title
+    }
+
+    private func stopLoop() {
+        driver?.stop()
+        driver = nil
+        tilt.stop()
         UIApplication.shared.isIdleTimerDisabled = false
-        phase = .title
     }
 
-    func showTitle() {
-        phase = .title
-    }
+    // MARK: - Frame
 
-    /// Simulator stand-in for the sensors: lands a stunt with a random landing.
-    func fakeStunt(_ kind: StuntKind) {
-        guard phase == .running else { return }
-        let landing: LandingGrade = [.greased, .clean, .clean, .sketchy].randomElement() ?? .clean
-        let stunt = DetectedStunt(kind: kind, time: ProcessInfo.processInfo.systemUptime, landing: landing, degrees: 0)
-        celebrate(session.land(stunt))
-    }
+    private func frame(_ dt: Double) {
+        let dt = min(dt, 0.1)
+        clock += dt
 
-    // MARK: - Run loop
-
-    private func ignite() {
-        countdownTask = nil
-        phase = .running
-        coachLine = CoachLines.ignition.randomElement() ?? ""
-        session.start(at: ProcessInfo.processInfo.systemUptime)
-        haptics.ignition()
-
-        motion.start { [weak self] sample in
-            self?.handle(sample)
+        var input = controls
+        input.spin = steeringWithTilt ? TiltSteering.spin(wheelAngleDegrees: tilt.wheelAngle) : spinButtons
+        accumulator += dt
+        while accumulator >= Self.stepSeconds {
+            sim.step(Self.stepSeconds, controls: input)
+            accumulator -= Self.stepSeconds
         }
-        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.tick() }
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
-    }
 
-    private func handle(_ sample: MotionSample) {
-        guard phase == .running else { return }
-        for claim in session.ingest(sample) {
-            celebrate(claim)
+        for event in sim.drainEvents() {
+            handle(event)
+        }
+        if (sim.boostFiring || sim.liftFiring) && clock - lastRumble > 0.06 {
+            lastRumble = clock
+            haptics.rumble(sim.boostFiring && sim.liftFiring ? 1 : 0.6)
+        }
+
+        updateCamera(dt)
+        updatePapers(dt)
+        coachLine = Coach.line(for: sim)
+
+        if let finishedAt, clock - finishedAt > 1.2 {
+            finish()
         }
     }
 
-    private func tick() {
-        guard phase == .running else { return }
-        session.tick(to: ProcessInfo.processInfo.systemUptime)
-        fuelRemaining = session.fuel.remaining
-        if session.isOver { finish() }
+    private func handle(_ event: SimEvent) {
+        switch event {
+        case .launched:
+            haptics.thump()
+            show("LAUNCH")
+        case .hitSixty(let seconds):
+            show("0–60 IN \(String(format: "%.2f", seconds)) S")
+            if seconds < Scorer.revealSixtyTime { haptics.success() }
+        case .fanOverheated:
+            haptics.warning()
+            show("FAN OVERHEAT")
+        case .fanRecovered:
+            haptics.click()
+        case .outOfAir:
+            haptics.warning()
+            show("AIR TANKS EMPTY")
+        case .enteredLoop:
+            break
+        case .completedLoop:
+            haptics.success()
+            show("LOOP!")
+        case .fellOffLoop:
+            haptics.warning()
+            show("LOST GRIP")
+        case .tookOff:
+            haptics.thump()
+            show("AIRBORNE")
+        case .cleared:
+            haptics.click()
+            show("CLEARED \(sim.clearedCount)/\(sim.course.vehicles.count)")
+        case .landed(let impact):
+            haptics.thump()
+            haptics.success()
+            show(Scorer.landingGrade(impact: impact) == .greased ? "GREASED IT" : "LANDED")
+        case .crashed:
+            haptics.crash()
+            show("TOTALED")
+            spawnPapers()
+        case .finished:
+            finishedAt = clock
+        }
     }
 
-    private func celebrate(_ claim: InsuranceClaim) {
-        claims = session.claims
-        chain = session.chain
-        fuelRemaining = session.fuel.remaining
-        coachLine = CoachLines.after(claim).randomElement() ?? ""
-        haptics.landed(claim.stunt.landing)
+    private func show(_ text: String) {
+        calloutCount += 1
+        callout = Callout(id: calloutCount, text: text, until: clock + 1.3)
     }
 
     private func finish() {
-        stopEverything()
-        UIApplication.shared.isIdleTimerDisabled = false
-        let report = session.report()
-        if report.totalClaimed > bestTotal {
-            bestTotal = report.totalClaimed
+        stopLoop()
+        var adjuster = InsuranceAdjuster(seed: UInt64.random(in: .min ... .max))
+        let report = ClaimsReport(claims: adjuster.fileAll(Scorer.stunts(from: sim)))
+        if report.score > bestScore {
+            bestScore = report.score
             isNewBest = true
         }
         self.report = report
-        haptics.outOfFuel()
-        withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-            phase = .finished
+        phase = .report
+    }
+
+    // MARK: - Camera and effects
+
+    private func updateCamera(_ dt: Double) {
+        let airborne = sim.segment == .air || sim.segment == .crashed
+        let lookAhead = min(14, max(4, sim.speed * 0.35))
+        let targetX = sim.x + (sim.segment == .loop ? 0 : lookAhead)
+        let targetY = max(6, sim.y + 2)
+        let targetWidth = airborne ? 72.0 : sim.segment == .loop ? 58 : 50
+        let blend = 1 - exp(-dt * 4)
+        camera.x += (targetX - camera.x) * blend
+        camera.y += (targetY - camera.y) * blend
+        camera.metersWide += (targetWidth - camera.metersWide) * (1 - exp(-dt * 2))
+    }
+
+    private func spawnPapers() {
+        papers = (0..<28).map { index in
+            Paper(
+                id: index,
+                x: sim.x,
+                y: sim.y + 1,
+                vx: sim.vx * 0.3 + Double.random(in: -6...6),
+                vy: Double.random(in: 3...11),
+                angle: Double.random(in: 0...(2 * .pi)),
+                spin: Double.random(in: -8...8)
+            )
         }
     }
 
-    private func stopEverything() {
-        countdownTask?.cancel()
-        countdownTask = nil
-        timer?.invalidate()
-        timer = nil
-        motion.stop()
-    }
-}
-
-enum CoachLines {
-    static let countdown = [
-        "Grip it like a tiny steering wheel.",
-        "Over a bed. Over a couch. Not over concrete.",
-        "Fuel is four seconds. The launch window is now.",
-    ]
-
-    static let ignition = [
-        "GO GO GO!",
-        "Send it!",
-        "Fuel's burning! Move!",
-    ]
-
-    static func after(_ claim: InsuranceClaim) -> [String] {
-        if claim.chain >= 3 {
-            return ["CHAIN IT! Don't stop now!", "The adjuster is sweating!", "Combo! Keep it rolling!"]
-        }
-        switch claim.stunt.landing {
-        case .greased:
-            return ["That's going in the brochure!", "Greased it!", "Textbook. Illegal, but textbook."]
-        case .clean:
-            return ["Nice! Again!", "Clean! Now something harder.", "Good! Chain the next one!"]
-        case .sketchy:
-            return ["Commit to the landing!", "Wheels DOWN next time!", "Sketchy! Finish the rotation!"]
+    private func updatePapers(_ dt: Double) {
+        guard !papers.isEmpty else { return }
+        for index in papers.indices {
+            var paper = papers[index]
+            let ground = sim.course.ground(at: paper.x).height
+            if paper.y <= ground {
+                paper.y = ground
+                paper.vx = 0
+                paper.vy = 0
+                paper.spin = 0
+            } else {
+                // Paper falls slowly and drifts.
+                paper.vy = max(paper.vy - 6 * dt, -2.5)
+                paper.vx *= 1 - min(1, 1.5 * dt)
+                paper.x += paper.vx * dt
+                paper.y += paper.vy * dt
+                paper.angle += paper.spin * dt
+            }
+            papers[index] = paper
         }
     }
 }

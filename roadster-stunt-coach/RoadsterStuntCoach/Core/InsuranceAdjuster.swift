@@ -34,10 +34,7 @@ enum ClaimStatus: Equatable {
 struct InsuranceClaim: Identifiable, Equatable {
     /// The claim number, e.g. "RSC-4821-03".
     let id: String
-    let stunt: DetectedStunt
-    /// How many stunts in a row this one finished (1 when it stands alone).
-    let chain: Int
-    let multiplier: Double
+    let stunt: Stunt
     /// Dollars claimed.
     let amount: Int
     let description: String
@@ -49,6 +46,8 @@ struct InsuranceClaim: Identifiable, Equatable {
 
 /// Files a fake insurance claim for every stunt.
 struct InsuranceAdjuster {
+    static let noDriverDenial = "There was no driver. The car filed this claim itself"
+
     private var rng: SeededGenerator
     private var filed = 0
 
@@ -56,22 +55,38 @@ struct InsuranceAdjuster {
         rng = SeededGenerator(seed: seed)
     }
 
-    mutating func file(_ stunt: DetectedStunt, chain: Int, multiplier: Double) -> InsuranceClaim {
+    mutating func file(_ stunt: Stunt) -> InsuranceClaim {
         filed += 1
         let jitter = Double.random(in: 0.9...1.15, using: &rng)
-        let amount = Int((stunt.kind.baseClaim * stunt.landing.claimMultiplier * multiplier * jitter).rounded())
+        let amount = Int((stunt.kind.baseClaim * Double(stunt.count) * stunt.grade.claimMultiplier * jitter).rounded())
         let serial = Int.random(in: 1000...9999, using: &rng)
+
+        let description: String
+        let status: ClaimStatus
+        if let reason = stunt.crash {
+            description = pick(Self.crashDescriptions(for: reason))
+            status = .denied(reason: Self.noDriverDenial)
+        } else {
+            description = pick(Self.descriptions(for: stunt.kind))
+            status = decide()
+        }
 
         return InsuranceClaim(
             id: String(format: "RSC-%04d-%02d", serial, filed),
             stunt: stunt,
-            chain: chain,
-            multiplier: multiplier,
             amount: amount,
-            description: pick(Self.descriptions(for: stunt.kind)),
-            adjusterNote: pick(Self.notes(for: stunt.landing)),
-            status: decide()
+            description: description,
+            adjusterNote: pick(Self.notes(for: stunt.grade)),
+            status: status
         )
+    }
+
+    mutating func fileAll(_ stunts: [Stunt]) -> [InsuranceClaim] {
+        var claims: [InsuranceClaim] = []
+        for stunt in stunts {
+            claims.append(file(stunt))
+        }
+        return claims
     }
 
     private mutating func decide() -> ClaimStatus {
@@ -89,59 +104,89 @@ struct InsuranceAdjuster {
 
     static func descriptions(for kind: StuntKind) -> [String] {
         switch kind {
-        case .ramp:
+        case .launch:
             return [
-                "Vehicle achieved altitude. Policy does not cover altitude.",
-                "Claimant describes the ramp as \"mostly decorative.\"",
-                "Front bumper briefly saw the sky and has not been the same since.",
+                "Vehicle reached 60 mph before the claimant finished saying \"go.\"",
+                "Rear thrusters fired on a public-ish runway. Several eyebrows left the ground.",
+                "Acceleration so sudden the paint is still at the starting line.",
             ]
-        case .kickflip:
+        case .loop:
             return [
-                "Vehicle rotated 360° on its long axis. Cupholders emptied in all directions.",
-                "Claimant states the car \"wanted to.\"",
-                "Roof and road traded places, then traded back.",
+                "Vehicle drove on the ceiling. We do not have a form for the ceiling.",
+                "Suction fans held the car upside down. Cupholders did not get the memo.",
+                "Claimant describes the loop as \"basically a very round road.\"",
             ]
-        case .doubleKickflip:
+        case .hop:
             return [
-                "Two complete rolls. Adjuster requested a third for the brochure.",
-                "Vehicle rolled twice. Passenger seat has filed its own claim.",
-                "Witnesses report \"a sports car doing a fidget spinner impression.\"",
-            ]
-        case .treFlip:
-            return [
-                "Simultaneous roll and spin. Our actuaries have gone home for the day.",
-                "Vehicle flipped and rotated at once. Physics has been notified.",
-                "Claimant insists this is \"a skateboard thing.\" It is a car.",
+                "Vehicle jumped a row of parked vehicles. The parked vehicles were not consulted.",
+                "Five-car hop. The Semi driver has requested therapy.",
+                "Airborne over a parking lot. Parking enforcement is reviewing the footage.",
             ]
         case .backflip:
             return [
-                "End-over-end rotation. The trunk is now the frunk.",
-                "Vehicle performed a backflip. Headlights saw the taillights.",
-                "Full flip. The glovebox is somewhere in the back seat.",
+                "Full backflip. The trunk saw the sky, then the ground, then the sky again.",
+                "Vehicle rotated end over end. Headlights briefly became taillights.",
+                "Claimant says the car \"just wanted to see behind itself.\"",
             ]
-        case .donut:
+        case .frontflip:
             return [
-                "Vehicle performed a donut in an area not zoned for donuts.",
-                "One full rotation. Tire marks spell out a word we can't print.",
-                "Claimant was \"just checking the mirrors from every angle.\"",
+                "Frontflip. The frunk is now emotionally the trunk.",
+                "Vehicle somersaulted forward. The glovebox is somewhere in the back seat.",
+                "Nose-first rotation. Our actuaries have gone home for the day.",
             ]
-        case .launch:
+        case .landing:
             return [
-                "Vehicle left the ground on purpose. Thrusters were not on the policy.",
-                "Sudden vertical acceleration. Air traffic control would like a word.",
-                "Car went up. Claimant is \"pretty sure\" it came back down.",
+                "Underbody thrusters fired to soften the landing. The ground was grateful.",
+                "Vehicle descended on a column of compressed air like a very expensive leaf.",
+                "Touchdown. Mission control has requested the car not do that again. Or do.",
             ]
-        case .hover:
+        case .totaled:
+            return ["Vehicle is now several smaller vehicles."]
+        }
+    }
+
+    static func crashDescriptions(for reason: CrashReason) -> [String] {
+        switch reason {
+        case .fellOffLoop:
             return [
-                "Vehicle hovered for one full second. This is not a feature we insure.",
-                "Car floated motionless. Claimant described it as \"vibing.\"",
-                "Sustained levitation. Adjuster has questions about the cold gas thrusters.",
+                "Vehicle detached from the ceiling of the loop. Ceiling unharmed.",
+                "Suction was described as \"more of a suggestion.\" Gravity disagreed.",
+            ]
+        case .stalled:
+            return [
+                "Vehicle ran out of momentum halfway up a ramp and reconsidered its choices.",
+                "Car stopped on a slope and then, inevitably, stopped being on the slope.",
+            ]
+        case .hitVehicle(let name):
+            return [
+                "Vehicle landed on the parked \(name). The \(name) has filed a counterclaim.",
+                "Claimant cleared every vehicle except the \(name), which was \"in the way.\"",
+            ]
+        case .hitRampWall:
+            return [
+                "Vehicle met the landing ramp from the side the landing ramp is not for.",
+                "Came up short. The back of the landing ramp is now an abstract sculpture.",
+            ]
+        case .onRoof:
+            return [
+                "Vehicle landed on its roof. The roof was not rated for this.",
+                "Upside-down landing. Technically all four wheels were in the air.",
+            ]
+        case .wrongAngle:
+            return [
+                "Vehicle met the ground at an angle the ground did not agree with.",
+                "Landed nose-first. The nose has filed a separate claim.",
+            ]
+        case .hardLanding:
+            return [
+                "Vehicle arrived at the ground faster than the ground was expecting.",
+                "Touchdown at speed. The suspension has retired.",
             ]
         }
     }
 
-    static func notes(for landing: LandingGrade) -> [String] {
-        switch landing {
+    static func notes(for grade: Grade) -> [String] {
+        switch grade {
         case .greased:
             return [
                 "Honestly? Beautiful.",
@@ -156,9 +201,9 @@ struct InsuranceAdjuster {
             ]
         case .sketchy:
             return [
-                "Witnesses describe the landing as \"a choice.\"",
+                "Witnesses describe it as \"a choice.\"",
                 "The car is fine. The vibes are not.",
-                "Landed on what we will generously call wheels.",
+                "We will generously call this an outcome.",
             ]
         }
     }
@@ -166,10 +211,10 @@ struct InsuranceAdjuster {
     static let denialReasons = [
         "Act of Marketing",
         "Pre-existing levitation",
-        "Vehicle was, technically, a phone",
+        "Policy excludes cold-gas thrusters",
         "Stunt not performed on a closed course",
-        "Policy excludes rocket thrusters",
         "Claimant was visibly having fun",
+        "Vehicle was, technically, a rocket",
         "See fine print, page 4,000",
     ]
 }

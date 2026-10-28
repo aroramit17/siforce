@@ -1,43 +1,51 @@
 import SwiftUI
 
 struct ClaimsReportView: View {
-    @EnvironmentObject private var game: GameController
+    @Environment(GameController.self) private var game
 
     var body: some View {
         if let report = game.report {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    header
-                    summary(report)
-                    verdict(report)
-                    if report.claims.isEmpty {
-                        Text("No claims filed. Your premium is safe. Your dignity is intact. Boring.")
-                            .font(.form(15))
-                            .foregroundStyle(Color.claimInk)
-                            .padding(.vertical, 24)
-                    } else {
-                        ForEach(report.claims) { claim in
-                            ClaimCardView(claim: claim)
-                        }
+            HStack(alignment: .top, spacing: 0) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        header
+                        summary(report)
+                        verdict(report)
                     }
-                    Text("Roadster Stunt Mutual is not a real insurer. No claims will be paid. Several will be laughed at.")
-                        .font(.form(11))
-                        .foregroundStyle(Color.claimInk.opacity(0.6))
+                    .padding(18)
                 }
-                .padding(20)
-                .background(Color.claimPaper, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                .padding(.horizontal, 12)
-                .padding(.top, 12)
+                .frame(maxWidth: 330)
+                .background(Color.claimPaper)
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        if report.claims.isEmpty {
+                            Text("No claims filed. The car never left the staging line. Your premium is safe. Boring.")
+                                .font(.form(15))
+                                .foregroundStyle(Color.claimInk)
+                                .padding(.vertical, 24)
+                        } else {
+                            ForEach(report.claims) { claim in
+                                ClaimCardView(claim: claim)
+                            }
+                        }
+                        Text("Roadster Stunt Mutual is not a real insurer. No claims will be paid. Several will be laughed at.")
+                            .font(.form(11))
+                            .foregroundStyle(Color.claimInk.opacity(0.6))
+                        actions(report)
+                    }
+                    .padding(18)
+                }
+                .background(Color.claimPaper.opacity(0.92))
             }
             .scrollIndicators(.hidden)
-            .safeAreaInset(edge: .bottom) { actions(report) }
         }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("CLAIMS REPORT")
-                .font(.form(26, weight: .heavy))
+                .font(.form(24, weight: .heavy))
             Text("Roadster Stunt Mutual · Form RSC-4S")
                 .font(.form(12))
             Text(Date.now.formatted(date: .abbreviated, time: .shortened))
@@ -49,13 +57,13 @@ struct ClaimsReportView: View {
 
     private func summary(_ report: ClaimsReport) -> some View {
         VStack(spacing: 8) {
-            row("Total claimed", Money.format(report.totalClaimed), bold: true)
+            row("Stunt claims", Money.format(report.score), bold: true)
             row("Actually paid", Money.format(report.totalPaid))
             row("Claims denied", "\(report.deniedCount) of \(report.claims.count)")
             row("Premium increase", "+\(report.premiumIncreasePercent)%")
-            row("Longest chain", report.bestChain > 1 ? "×\(report.bestChain)" : "—")
+            row("Outcome", report.landed ? "Stuck the landing" : "Totaled")
         }
-        .font(.form(15))
+        .font(.form(14))
         .foregroundStyle(Color.claimInk)
         .padding(14)
         .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.claimInk.opacity(0.3), style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
@@ -85,17 +93,18 @@ struct ClaimsReportView: View {
                 .font(.form(12, weight: .heavy))
                 .opacity(0.7)
             Text(report.rank.title)
-                .font(.poster(28))
+                .font(.poster(26))
                 .foregroundStyle(Color.roadsterRed)
             Text("“\(report.rank.coachSays)”")
-                .font(.form(14))
+                .font(.form(13))
+                .fixedSize(horizontal: false, vertical: true)
         }
         .foregroundStyle(Color.claimInk)
     }
 
     private func actions(_ report: ClaimsReport) -> some View {
         VStack(spacing: 10) {
-            Button("RUN IT BACK") { game.startRun() }
+            Button("RUN IT BACK") { game.newRun() }
                 .buttonStyle(BigButtonStyle())
             HStack(spacing: 10) {
                 ShareLink(item: report.shareText) {
@@ -103,18 +112,16 @@ struct ClaimsReportView: View {
                         .frame(maxWidth: .infinity)
                 }
                 Button {
-                    game.showTitle()
+                    game.quitToTitle()
                 } label: {
                     Label("Garage", systemImage: "house.fill")
                         .frame(maxWidth: .infinity)
                 }
             }
-            .buttonStyle(.bordered)
-            .tint(.white)
+            .buttonStyle(.borderedProminent)
+            .tint(.claimInk)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
-        .background(.ultraThinMaterial)
+        .padding(.top, 6)
     }
 }
 
@@ -134,17 +141,17 @@ struct ClaimCardView: View {
             HStack(spacing: 8) {
                 Text(claim.stunt.kind.title)
                     .font(.headline)
-                Text(claim.stunt.landing.title.uppercased())
-                    .font(.form(11, weight: .heavy))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .overlay(Capsule().strokeBorder(Color.claimInk.opacity(0.4)))
-                if claim.chain > 1 {
-                    Text("CHAIN ×\(claim.chain)")
+                if claim.stunt.kind != .totaled {
+                    Text(claim.stunt.grade.title.uppercased())
                         .font(.form(11, weight: .heavy))
-                        .foregroundStyle(Color.roadsterRed)
+                        .foregroundStyle(claim.stunt.grade.color)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .overlay(Capsule().strokeBorder(Color.claimInk.opacity(0.4)))
                 }
             }
+            Text(claim.stunt.detail)
+                .font(.form(12, weight: .semibold))
             Text(claim.description)
                 .font(.form(13))
                 .fixedSize(horizontal: false, vertical: true)
